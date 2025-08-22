@@ -34,7 +34,7 @@ def find_pressure_for_st(steam, s_target, t, p_min=0.01, p_max=400, tol=1e-3, n_
     
     if not (s_min <= s_target <= s_max):
         return None  # No solution possible
-        
+    
     for _ in range(n_samples):
         p_mid = (p_min + p_max) / 2
         # print(f"Trying pressure: {p_mid} bar")
@@ -213,13 +213,15 @@ def plot_line_between_points(steam, pt_start, pt_end, n_points=50):
     s_start, t_start, p_start = pt_start_data
     s_end, t_end, p_end = pt_end_data
     
-    if pt_end['type'] == "expansion":
-        plt.plot([s_start, s_end], [t_start, t_end], linestyle='-', label=f'Expansion {pt_start["name"]} to {pt_end["name"]}')
+    if pt_end['type'] == "linear":
+        # plt.plot([s_start, s_end], [t_start, t_end], linestyle='-', label=f'Linear from {pt_start["name"]} to {pt_end["name"]}')
+        plt.plot([s_start, s_end], [t_start, t_end], linestyle='-')
         plt.scatter([s_start, s_end], [t_start, t_end])
         plt.text(s_start, t_start, f' {pt_start["name"]}', fontsize=10, va='bottom')
         plt.text(s_end, t_end, f' {pt_end["name"]}', fontsize=10, va='bottom')
         return
 
+    # If not linear, interpolate between points
     pressures = np.linspace(p_start, p_end, n_points)
     temperatures = np.linspace(t_start, t_end, n_points)
     entropies = []
@@ -231,56 +233,83 @@ def plot_line_between_points(steam, pt_start, pt_end, n_points=50):
         except Exception:
             entropies.append(np.nan)
 
-    plt.plot(entropies, temperatures, linestyle='-', label=f'Line {pt_start["name"]} to {pt_end["name"]}')
+    # plt.plot(entropies, temperatures, linestyle='-', label=f'Line {pt_start["name"]} to {pt_end["name"]}')
+    plt.plot(entropies, temperatures, linestyle='-')
     plt.scatter([entropies[0], entropies[-1]], [temperatures[0], temperatures[-1]])
     plt.text(entropies[0], temperatures[0], f' {pt_start["name"]}', fontsize=10, va='bottom')
     plt.text(entropies[-1], temperatures[-1], f' {pt_end["name"]}', fontsize=10, va='bottom')
     
-def plot_ts_diagram_DH3E():
+def plot_ts_diagram_DH3E(rateOperated=100):
     
     plot_ts_saturated_lines()
     
     # Define DH3E plant points at 100RO
-    dh3e_points = [
-        {"name": "1", "p": 0.0714, "t": 39.4, "type": ""}, # Condenser
-        {"name": "2", "h": 168, "t": 39.8, "type": ""}, # Condensate pump outlet
-        {"name": "3", "h": 307.7, "t": 73.2, "type": ""}, # LP Heater 8
-        {"name": "4", "h": 384.7, "t": 91.6, "type": ""}, # LP Heater 7
-        {"name": "5", "h": 481.4, "t": 114.5, "type": ""}, # LP Heater 6
-        {"name": "6", "h": 591.1, "t": 140.3, "type": ""}, # LP Heater 5
-        {"name": "7", "p": 8.25, "t": 171.69, "type": ""}, # Dearator: Change 171.7 -> 171.69 to match saturation temperature lower limit
-        {"name": "8", "h": 767.6, "t": 177.4, "type": ""}, # BFP
-        {"name": "9", "h": 888.9, "t": 205.4, "type": ""}, # HP Heater 3
-        {"name": "10", "h": 1130.4, "t": 259.1, "type": ""}, # HP Heater 2
-        {"name": "11", "h": 1288, "t": 291.9, "type": ""}, # HP Heater 1
-        {"name": "12", "p": 242.2, "t": 566, "type": ""}, # Main Steam     
-        {"name": "13", "h": 2992.6, "p": 47.67, "type": "expansion"}, # Reheater inlet      
-        {"name": "14", "t": 566, "p": 43.38, "type": ""}, # Reheater outlet
-        {"name": "1", "p": 0.0714, "t": 39.4, "type": "expansion"}, # Condenser           
+    dh3e_points_100_ro = [
+        {"name": "COND", "p": 0.0714, "t": 39.4, "type": "interpolate"}, # Condenser
+        {"name": "COND PMP", "h": 168, "t": 39.8, "type": "linear"}, # Condensate pump outlet
+        {"name": "LP #8", "h": 307.7, "t": 73.2, "type": "interpolate"}, # LP Heater 8
+        {"name": "LP #7", "h": 384.7, "t": 91.6, "type": "interpolate"}, # LP Heater 7
+        {"name": "LP #6", "h": 481.4, "t": 114.5, "type": "interpolate"}, # LP Heater 6
+        {"name": "LP #5", "h": 591.1, "t": 140.3, "type": "interpolate"}, # LP Heater 5
+        {"name": "DEA", "p": 8.25, "t": 171.69, "type": "interpolate"}, # Dearator: Change 171.7 -> 171.69 to match saturation temperature lower limit
+        {"name": "BFP", "h": 767.6, "t": 177.4, "type": "interpolate"}, # BFP
+        {"name": "HP #3", "h": 888.9, "t": 205.4, "type": "interpolate"}, # HP Heater 3
+        {"name": "HP #2", "h": 1130.4, "t": 259.1, "type": "interpolate"}, # HP Heater 2
+        {"name": "HP #1", "h": 1288, "t": 291.9, "type": "interpolate"}, # HP Heater 1
+        {"name": "MS", "p": 242.2, "t": 566, "type": "interpolate"}, # Main Steam     
+        {"name": "CRH", "h": 2992.6, "p": 47.67, "type": "linear"}, # Reheater inlet      
+        {"name": "HRH", "t": 566, "p": 43.38, "type": "interpolate"}, # Reheater outlet
+        {"name": "COND", "p": 0.0714, "t": 39.4, "type": "linear"}, # Condenser           
     ]
-    # s = []
-    # t = []
-    # p = []
-    # for pt in dh3e_points:
-    #     s_i, t_i, p_i = get_point_data(pt, steam)
-    #     if s is not None and t is not None:
-    #         s.append(s_i)
-    #         t.append(t_i)
-    #         p.append(p_i)
-    #         plt.plot(s_i, t_i, 'ko')  # Black circle
-    #         plt.text(s_i, t_i, f" {pt['name']}", color='black', fontsize=10, va='bottom')
-    #     else:
-    #         print(Fore.RED + f"Could not plot point {pt['name']}: insufficient or invalid data.")
-    # plt.plot(s, t, label='DH3E Points')
     
-    # plot_ts_diagram_multiple_pressures(steam, [242.2, 302.2])
+    # Define DH3E plant points at 75RO
+    dh3e_points_75_ro = [
+        {"name": "COND", "p": 0.0614, "t": 36.62, "type": "interpolate"}, # Condenser => Change 36.6 -> 36.62 to to be vapor at 75% RO
+        {"name": "COND PMP", "h": 156.9, "t": 37.1, "type": "linear"}, # Condensate pump outlet
+        {"name": "LP #8", "h": 285, "t": 68, "type": "interpolate"}, # LP Heater 8
+        {"name": "LP #7", "h": 357.8, "t": 85.2, "type": "interpolate"}, # LP Heater 7
+        {"name": "LP #6", "h": 450.7, "t": 107.3, "type": "interpolate"}, # LP Heater 6
+        {"name": "LP #5", "h": 554.9, "t": 131.8, "type": "interpolate"}, # LP Heater 5
+        {"name": "DEA", "p": 6.23, "t": 160.3, "type": "interpolate"}, # Dearator: 
+        {"name": "BFP", "h": 711.5, "t": 165, "type": "interpolate"}, # BFP
+        {"name": "HP #3", "h": 830.4, "t": 192.6, "type": "interpolate"}, # HP Heater 3
+        {"name": "HP #2", "h": 1053, "t": 242.5, "type": "interpolate"}, # HP Heater 2
+        {"name": "HP #1", "h": 1197.7, "t": 273.3, "type": "interpolate"}, # HP Heater 1
+        {"name": "MS", "p": 200.04, "t": 566, "type": "interpolate"}, # Main Steam     
+        {"name": "CRH", "h": 3027.1, "p": 35.77, "type": "linear"}, # Reheater inlet      
+        {"name": "HRH", "t": 566, "p": 32.55, "type": "interpolate"}, # Reheater outlet
+        {"name": "COND", "p": 0.0614, "t": 36.62, "type": "linear"}, # Condenser           
+    ]
+    
+    # Define DH3E plant points at 50RO
+    dh3e_points_50_ro = [
+        {"name": "COND", "p": 0.0561, "t": 34.98, "type": "interpolate"}, # Condenser: Change 34.9 -> 34.98 to be vapor and available at 50% RO
+        {"name": "COND PMP", "h": 151, "t": 35.7, "type": "linear"}, # Condensate pump outlet
+        {"name": "LP #8", "h": 251.2, "t": 59.7, "type": "interpolate"}, # LP Heater 8
+        {"name": "LP #7", "h": 322.6, "t": 76.8, "type": "interpolate"}, # LP Heater 7
+        {"name": "LP #6", "h": 408, "t": 97.1, "type": "interpolate"}, # LP Heater 6
+        {"name": "LP #5", "h": 504.9, "t": 120, "type": "interpolate"}, # LP Heater 5
+        {"name": "DEA", "p": 4.23, "t": 145.6, "type": "interpolate"}, # Dearator: Change 145.7 -> 145.63 to match saturation temperature lower limit
+        {"name": "BFP", "h": 636.6, "t": 148.7, "type": "interpolate"}, # BFP
+        {"name": "HP #3", "h": 748.8, "t": 174.8, "type": "interpolate"}, # HP Heater 3
+        {"name": "HP #2", "h": 948.8, "t": 220.2, "type": "interpolate"}, # HP Heater 2
+        {"name": "HP #1", "h": 1079, "t": 248.5, "type": "interpolate"}, # HP Heater 1
+        {"name": "MS", "p": 133.3, "t": 566, "type": "interpolate"}, # Main Steam     
+        {"name": "CRH", "h": 3078, "p": 24.05, "type": "linear"}, # Reheater inlet      
+        {"name": "HRH", "t": 566, "p": 21.89, "type": "interpolate"}, # Reheater outlet
+        {"name": "COND", "p": 0.0561, "t": 34.98, "type": "linear"}, # Condenser           
+    ]
+    
+    dh3e_points = dh3e_points_100_ro if rateOperated == 100 else (
+        dh3e_points_75_ro if rateOperated == 75 else dh3e_points_50_ro
+    )
     
     for i in range(len(dh3e_points) - 1):
         pt_start = dh3e_points[i]
         pt_end = dh3e_points[i + 1]
         plot_line_between_points(steam, pt_start, pt_end)
     
-    plt.title('T-S Diagram for DH3E plant')
+    plt.title(f'T-S Diagram for DH3E at {rateOperated}% RO')
     plt.grid(True)
     plt.legend()
     plt.show()
@@ -294,8 +323,10 @@ def main():
         print(Fore.LIGHTYELLOW_EX + "4. Plot T-S diagram at pressure")
         print(Fore.LIGHTYELLOW_EX + "5. Plot T-S diagram at multiple pressures")
         print(Fore.LIGHTYELLOW_EX + "6. Pump efficiency by thermodynamic method")
-        print(Fore.LIGHTYELLOW_EX + "7. Plot T-S diagram for DH3E plant points")
+        print(Fore.LIGHTYELLOW_EX + "7. Plot T-S diagram for DH3E at 100% RO")
         print(Fore.LIGHTYELLOW_EX + "8. Find pressure for given enthalpy and temperature")
+        print(Fore.LIGHTYELLOW_EX + "9. Plot T-S diagram for DH3E at 75% RO")
+        print(Fore.LIGHTYELLOW_EX + "10. Plot T-S diagram for DH3E at 50% RO")
         print(Fore.LIGHTYELLOW_EX + "0. Exit")
         choice = input("Enter your choice: ")
 
@@ -366,8 +397,8 @@ def main():
             else:
                 print(Fore.RED + f"Inlet temperature is above saturation temperature {Fore.CYAN}{tsatp1}{Style.RESET_ALL}, cannot calculate pump efficiency in this region.")
         elif choice == "7":
-            print(Fore.BLUE + "Plotting T-S diagram for DH3E plant points...")
-            plot_ts_diagram_DH3E()
+            print(Fore.BLUE + "Plotting T-S diagram for DH3E at 100RO")
+            plot_ts_diagram_DH3E(100)
         elif choice == "8":
             s = float(input("Enter entropy (kJ/(kg K)): "))
             t = float(input("Enter temperature (°C): "))
@@ -377,6 +408,12 @@ def main():
                 print(f"Enthalpy at {p} bar and {t} °C: {Fore.GREEN}{steam.h_pt(p, t)}{Style.RESET_ALL} kJ/kg")
             else:
                 print(Fore.RED + "No valid pressure found for the given entropy and temperature.")
+        elif choice == "9":
+            print(Fore.BLUE + "Plotting T-S diagram for DH3E at 75RO")
+            plot_ts_diagram_DH3E(75)
+        elif choice == "10":
+            print(Fore.BLUE + "Plotting T-S diagram for DH3E at 50RO")
+            plot_ts_diagram_DH3E(50)
         elif choice == "0":
             print("Exiting...")
             break
